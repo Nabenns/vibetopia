@@ -40,8 +40,8 @@ services:
       postgres: { condition: service_healthy }
     environment:
       DATABASE_URL: "postgres://vibetopia:***@postgres:5432/vibetopia?sslmode=disable"
-      REDIS_URL: "redis://redis:***@localhost:5432/vibetopia?sslmode=disable"
       REDIS_URL: "redis://redis:***@postgres:5432/vibetopia?sslmode=disable"
+      LISTEN_ADDR: ":8080"
 
 volumes:
   pgdata:
