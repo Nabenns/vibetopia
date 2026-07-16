@@ -1,0 +1,14 @@
+# Binary files
+items.dat
+
+# Build artifacts
+game-server
+login-server
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
