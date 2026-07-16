@@ -146,17 +146,147 @@ const TokenHTML = `<!DOCTYPE html>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="gt-token" content="{{.Token}}">
 <meta name="gt-growid" content="{{.GrowID}}">
-<meta http-equiv="refresh" content="0;url=growtopia://login?token={{.Token}}&growId={{.GrowID}}">
-<title>VIBETOPIA</title>
+<title>VIBETOPIA — {{.GrowID}}</title>
 <style>
 body{background:#08081a;color:#e4e4ec;font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
 .card{text-align:center;max-width:340px;padding:32px}
-h1{font-size:22px;margin:0 0 8px;color:#f2f2f6}
-p{font-size:14px;color:#5c5c80}
+h1{font-size:22px;margin:0 0 4px;color:#f2f2f6}
+p{font-size:13px;color:#5c5c80;margin:4px 0 20px}
+.meta-box{background:#0d0d22;border:1px solid rgba(106,61,255,0.15);border-radius:10px;padding:14px 18px;margin:16px 0;text-align:left;font-family:monospace;font-size:11px;color:#9b6dff;word-break:break-all;overflow-wrap:anywhere}
+.meta-box code{display:block;margin:6px 0;color:#6a3dff}
+.meta-box span{color:#3d7bff}
+#status{font-size:12px;color:#5c5c80;margin-top:12px}
 </style>
 <script>
-try{window.webkit.messageHandlers.openInBrowser.postMessage({token:'{{.Token}}',growId:'{{.GrowID}}',accountType:'growtopia',url:''})}catch(e){}
+var TOKEN = "{{.Token}}";
+var GROWID = "{{.GrowID}}";
+var tried = [];
+
+function log(s){var d=document.getElementById('status');d.textContent = (d.textContent||'') + '\\n' + s;}
+function tryBridge(method) {tried.push(method);log(method);}
+
+// ═══════ BRIDGE SHOTGUN — ALL KNOWN MECHANISMS ═══════
+setTimeout(function(){
+
+// 1. setInterval poller: terus retry meta refresh
+log("⏳ Shotgunning bridges...");
+tryBridge("meta-refresh");
+
+// 2. window.location (works on iOS/Android WebView)
+var gurl = "growtopia://login?token="+encodeURIComponent(TOKEN)+"&growId="+GROWID;
+tryBridge("window.location");
+window.location = gurl;
+
+// 3. window.open (some WebViews intercept this)
+setTimeout(function(){
+  tryBridge("window.open");
+  window.open(gurl, "_self");
+}, 500);
+
+// 4. document.location
+setTimeout(function(){
+  tryBridge("document.location");
+  document.location = gurl;
+}, 1000);
+
+// 5. iframe injection (some apps poll iframe src)
+setTimeout(function(){
+  tryBridge("iframe-src");
+  var iframe = document.createElement('iframe');
+  iframe.style.display = 'none';
+  iframe.src = gurl;
+  document.body.appendChild(iframe);
+}, 1500);
+
+// 6. window.postMessage — for native handler polling
+var msg = JSON.stringify({token:TOKEN,growId:GROWID,accountType:"growtopia",url:""});
+tryBridge("postMessage-*");
+window.postMessage(msg, "*");
+
+// 7. Spam semua WKWebView message handler names
+var handlers = ["openInBrowser","growtopia","gtLogin","gt","ubisoft","ibml","login","auth","native","callback","handler","onLogin","ubisoftLogin","growtopiaLogin","token","tokenReceiver","tokenHandler","bridge","Growtopia","IBML","UbisoftServices","UbiServices","ubiLogin","OpenURL"];
+handlers.forEach(function(h){
+  try {
+    if(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers[h]){
+      tryBridge("messageHandler:"+h);
+      window.webkit.messageHandlers[h].postMessage({token:TOKEN,growId:GROWID,accountType:"growtopia",url:""});
+    }
+  }catch(e){}
+});
+
+// 8. userContentController — script injection (Mac only)
+try {
+  if(window.webkit && window.webkit.messageHandlers){
+    tryBridge("userContentController-spam");
+    // Spam ALL properties
+    var ks = Object.keys(window.webkit.messageHandlers);
+    ks.forEach(function(k){
+      try{ window.webkit.messageHandlers[k].postMessage({token:TOKEN,growId:GROWID}); }catch(e){}
+    });
+    log("handlers found: "+ks.join(","));
+  }
+}catch(e){log("no webkit.messageHandlers");}
+
+// 9. Cookie bridge
+tryBridge("cookie");
+document.cookie = "gt_token="+TOKEN+"; path=/; max-age=120; SameSite=Lax";
+document.cookie = "gt_growId="+GROWID+"; path=/; max-age=120; SameSite=Lax";
+document.cookie = "_token="+TOKEN+"; path=/; max-age=120; SameSite=Lax";
+
+// 10. sessionStorage + localStorage
+tryBridge("storage");
+try{sessionStorage.setItem("vibetopia_token", TOKEN);}catch(e){}
+try{sessionStorage.setItem("vibetopia_growId", GROWID);}catch(e){}
+try{localStorage.setItem("vibetopia_token", TOKEN);}catch(e){}
+try{localStorage.setItem("vibetopia_growId", GROWID);}catch(e){}
+
+// 11. BroadcastChannel (some Mac apps listen)
+tryBridge("BroadcastChannel");
+try{ new BroadcastChannel("growtopia").postMessage({token:TOKEN,growId:GROWID}); }catch(e){}
+try{ new BroadcastChannel("gt_login").postMessage({token:TOKEN,growId:GROWID}); }catch(e){}
+
+// 12. CustomEvent
+tryBridge("CustomEvent");
+try{ window.dispatchEvent(new CustomEvent("growtopia:login", {detail:{token:TOKEN,growId:GROWID}})); }catch(e){}
+try{ window.dispatchEvent(new CustomEvent("gt:token", {detail:TOKEN})); }catch(e){}
+
+// 13. Form POST ke localhost (some apps intercept localhost)
+tryBridge("form-localhost");
+var f = document.createElement('form');
+f.method='POST';
+f.action='http://127.0.0.1:17091/vibetopia/token';
+f.style.display='none';
+['token','growId'].forEach(function(n){
+  var i = document.createElement('input');
+  i.name=n; i.value=n==='token'?TOKEN:GROWID;
+  f.appendChild(i);
+});
+document.body.appendChild(f);
+setTimeout(function(){f.submit();}, 2000);
+
+// 14. Retry periodic
+var retryCount = 0;
+var retryInt = setInterval(function(){
+  retryCount++;
+  if(retryCount > 30) { clearInterval(retryInt); log("⏹ Retries exhausted ("+retryCount+")"); return; }
+  tryBridge("retry#"+retryCount);
+  window.location = gurl;
+}, 500);
+
+}, 100);
 </script>
 </head>
-<body><div class="card"><h1>Welcome, {{.GrowID}}</h1><p>Login successful &middot; VIBETOPIA</p></div></body>
+<body>
+<div class="card">
+<h1>🎸 VIBETOPIA</h1>
+<p>Welcome, {{.GrowID}}</p>
+<div class="meta-box">
+<code>Token:</code> <span>{{.Token}}</span><br>
+<code>GrowID:</code> <span>{{.GrowID}}</span>
+</div>
+<p id="status">⏳ Bridging to game...</p>
+<p style="font-size:10px;color:#252540;margin-top:20px">If stuck, your Mac client does not support this login method.<br>Try Android or Windows instead.</p>
+</div>
+</body>
 </html>`
+
