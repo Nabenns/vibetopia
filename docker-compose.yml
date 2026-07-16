@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: vibetopia
+      POSTGRES_USER: vibetopia
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-vibetopia123}
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "vibetopia"]
+      interval: 5s
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    volumes: [redisdata:/data]
+    command: redis-server --appendonly yes
+
+  game-server:
+    build:
+      context: .
+      dockerfile: docker/game-server.Dockerfile
+    ports: ["17091:17091/udp"]
+    cap_add: [NET_ADMIN]
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      DATABASE_URL: "postgres://vibetopia:***@postgres:5432/vibetopia?sslmode=disable"
+      REDIS_URL: "redis://redis:***@postgres:5432/vibetopia?sslmode=disable"
+      GAME_PORT: "17091"
+      GAME_SERVER_IP: "103.253.213.178"
+
+  login-server:
+    build:
+      context: .
+      dockerfile: docker/login-server.Dockerfile
+    ports: ["8080:8080"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      DATABASE_URL: "postgres://vibetopia:***@postgres:5432/vibetopia?sslmode=disable"
+      REDIS_URL: "redis://redis:***@localhost:5432/vibetopia?sslmode=disable"
+      REDIS_URL: "redis://redis:***@postgres:5432/vibetopia?sslmode=disable"
+
+volumes:
+  pgdata:
+  redisdata:
